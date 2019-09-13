@@ -54,3 +54,5 @@ dkms.conf
 # added by Qifan
 bin
 .idea
+CMakeLists.txt
+cmake-build-debug
