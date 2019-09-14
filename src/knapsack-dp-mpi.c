@@ -52,6 +52,7 @@ int main(int argc, char *argv[]) {
 
 /* PLACE YOUR CHANGES BELOW HERE */
 #include <assert.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <strings.h>
 #include <unistd.h>
@@ -160,6 +161,17 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+
+    // allocate memory for DP memoisation table
+    long int **K = malloc((n + 1) * sizeof *K);
+    for (int i = 0; i < n + 1; i++)
+        K[i] = malloc((C + 1) * sizeof *K[i]);
+
+    // initialise all cells to default value INT_MIN
+    for (size_t r = 0; r < n + 1; r++)
+        for (size_t c = 0; c < C + 1; c++)
+            K[r][c] = INT_MIN;
+
     task_request(rank, 888, mpi_task_status);
 
     receiveAllMsg(rank, nprocs, mpi_task_status);
