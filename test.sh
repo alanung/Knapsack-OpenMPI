@@ -1,11 +1,16 @@
 test() {
   ./build.sh
-  Problem=$(./bin/generator $1 $2 $3)
-  echo -e $Problem
-  echo $Problem |mpirun ./bin/knapsack-dp-mpi
+  ./bin/generator $1 $2 $3 > in_sadfasdf
+  cat in_sadfasdf
+  echo "The knapsack-dp-seq:"
+  cat in_sadfasdf | mpirun ./bin/knapsack-dp-seq
+
+  echo "The knapsack-dp-mpi:"
+  cat in_sadfasdf | mpirun ./bin/knapsack-dp-mpi -np 1
+  rm in_sadfasdf
 }
 
-if [ ! $1 ] || [ ! $2 ] || [ ! $3 ] ; then
+if [ ! $1 ] || [ ! $2 ] || [ ! $3 ]; then
   echo -e "Usage:\r\n  ./tesh.sh \$C \$n \$mean\r\n"
   echo -e "Example:\r\n  tesh.sh 10 7 8\r\n"
 

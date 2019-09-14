@@ -1,9 +1,9 @@
-echo -e "[*] Compiling knapsack-dp-seq.c to bin/knapsack ... \c"
+echo -e "[*] Compiling knapsack-dp-seq.c to bin/knapsack-dp-seq ... \c"
 mpicc src/orig/knapsack-dp-seq.c -o bin/knapsack-dp-seq
 echo -e "done."
 
-echo -e "[*] Compiling knapsack-dp-mpi.c to bin/knapsack ... \c"
-mpicc src/knapsack-dp-mpi.c -o bin/knapsack-dp-mpi
+echo -e "[*] Compiling knapsack-dp-mpi.c to bin/knapsack-dp-mpi ... \c"
+mpicc src/knapsack-dp-mpi.c -o bin/knapsack-dp-mpi -std=c99
 echo -e "done."
 
 echo -e "[*] Compiling generator.c to bin/generator ... \c"

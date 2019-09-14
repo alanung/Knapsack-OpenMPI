@@ -51,18 +51,14 @@ int main(int argc, char *argv[]) {
 }
 
 /* PLACE YOUR CHANGES BELOW HERE */
-#include <assert.h>
 #include <limits.h>
 #include <stdbool.h>
-#include <strings.h>
-#include <unistd.h>
-
-#define TAG_TASK_REQUEST 0
-#define TAG_TASK_REFUSAL 1
+#include <stdlib.h>
+#include <assert.h>
 
 typedef struct {
     int requester;
-    int task;
+    long int task;
 } TaskRequest;
 
 typedef struct {
@@ -71,14 +67,19 @@ typedef struct {
 
 typedef struct {
     int row;
-    int col;
-    int val;
+    long int col;
+    long int val;
 } CellResult;
 
 typedef struct {
     int row;
     int col;
 } TaskStatus;
+
+
+#define TAG_TASK_REQUEST 0
+#define TAG_TASK_REFUSAL 1
+#define TAG_RESULT 2
 
 #define MPI_TASK_STATUS 0
 #define MPI_CELL_RESULT 1
@@ -102,7 +103,7 @@ MPI_Datatype structs_register(int type) {
     } else if (type == MPI_CELL_RESULT) {
         CellResult cell_result;
         MPI_Datatype mpi_cell_result;
-        MPI_Datatype old_types[3] = {MPI_INT, MPI_INT, MPI_INT};
+        MPI_Datatype old_types[3] = {MPI_INT, MPI_LONG, MPI_LONG};
         MPI_Aint indices[3];
         int block_length[3] = {1, 1, 1};
         MPI_Address(&cell_result, &indices[0]);
@@ -117,7 +118,7 @@ MPI_Datatype structs_register(int type) {
     } else if (type == MPI_TASK_REQUEST) {
         TaskRequest task_request;
         MPI_Datatype mpi_task_request;
-        MPI_Datatype old_types[2] = {MPI_INT, MPI_INT};
+        MPI_Datatype old_types[2] = {MPI_INT, MPI_LONG};
         MPI_Aint indices[2];
         int block_length[2] = {1, 1};
         MPI_Address(&task_request, &indices[0]);
@@ -152,6 +153,11 @@ long int max(long int x, long int y) {
 }
 
 long int knapSack(long int C, long int w[], long int v[], int n) {
+    MPI_Bcast(&C, 1, MPI_LONG, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    MPI_Bcast(w, n, MPI_LONG, 0, MPI_COMM_WORLD);
+    MPI_Bcast(v, n, MPI_LONG, 0, MPI_COMM_WORLD);
     int rank, nprocs;
     //register mpi struct types
     MPI_Datatype mpi_task_status = structs_register(MPI_TASK_STATUS);
@@ -159,61 +165,200 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
     MPI_Datatype mpi_task_request = structs_register(MPI_TASK_REQUEST);
     MPI_Datatype mpi_task_refusal = structs_register(MPI_TASK_REFUSAL);
 
+    TaskStatus task_status;
+    CellResult cell_result;
+    TaskRefusal task_refusal;
+    TaskRequest task_request;
+
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+//    nprocs=1;
 
     // allocate memory for DP memoisation table
     long int **K = malloc((n + 1) * sizeof *K);
-    for (size_t i = 0; i < n + 1; i++)
+    assert(K);
+    for (long int i = 0; i < n + 1; i++) {
         K[i] = malloc((C + 1) * sizeof *K[i]);
-
+        assert(K[i]);
+    }
     // initialise all cells to default value INT_MIN
-    for (size_t row = 0; row < n + 1; row++)
-        for (size_t col = 0; col < C + 1; col++)
-            K[row][col] = INT_MIN;
-
-    // all processes initially process the column corresponding to their rank
-    long int col;
-    if (rank < C + 1)
-        col = (long int) rank;
-
-    while (true) {
-        for (size_t row = 0; row < n + 1; row++) {
-            // calculate the value of this cell if dependencies are available
-            if (row == 0 || col == 0)
-                K[row][col] = 0;
-            else if (w[row-1] <= col)
-                K[row][col] = max(row-1 + K[row-1][col - w[row-1]],  // include
-                                  K[row-1][col]);  // exclude
-            else
-                K[row][col] = K[row-1][col];
-            mpi_cell_result.cell=
-            // broadcast calculated value to other processes
-
+    for (long int row = 0; row < n + 1; row++) {
+        for (long int col = 0; col < C + 1; col++) {
+            K[row][col] = -1;
         }
     }
 
-    task_request(rank, 888, mpi_task_status);
 
-    receiveAllMsg(rank, nprocs, mpi_task_status);
+    // all processes initially process the column corresponding to their rank
 
 
-    printf("[*] P-%d started.\n", rank);
-    // int i;
-    // long int wt;
-    // long int K[n+1][C+1];
-    // for (i = 0; i <= n; i++) {
-    //     for (wt = 0; wt <= C; wt++) {
-    //         if (i == 0 || wt == 0)
-    //             K[i][wt] = 0;
-    //         else if (w[i-1] <= wt)
-    //             K[i][wt] = max(v[i-1] + K[i-1][wt - w[i-1]], K[i-1][wt]);
-    //         else
-    //             K[i][wt] = K[i-1][wt];
-    //     }
-    // }
-    // return K[n][C];
+    long int *who_is_handling = malloc(nprocs * sizeof *who_is_handling);
+    for (long int j = 0; j < C + 1; ++j) {
+        who_is_handling[j] = -1;
+    }
+    MPI_Request request;
+
+    long int col = rank;
+//    who_is_handling[col] = rank;
+//
+//    task_request.task = rank;
+//    task_request.requester = rank;
+//
+//    for (int dst = 0; dst < nprocs; dst++) {
+//        if (dst != rank) {
+////            printf("[*] P-%d :%d\n", rank, dst);
+//            MPI_Isend(&task_request, 1, mpi_task_request, dst, TAG_TASK_REQUEST, MPI_COMM_WORLD, &request);
+//        }
+//    }
+//
+//    // recv msg
+//    int flag = true;
+//    while (flag) {
+//
+//        MPI_Irecv(&task_request, 1, mpi_task_request, MPI_ANY_SOURCE, TAG_TASK_REQUEST,
+//                  MPI_COMM_WORLD, &request);
+//        MPI_Test(&request, &flag, MPI_STATUS_IGNORE);
+//        who_is_handling[task_request.task] = task_request.requester;
+//    };
+
+    while (true) {
+        for (int row = 0; row < n + 1; row++) {
+            // calculate the value of this cell if dependencies are available
+            if (K[row][col] != -1) break;
+//            if (row == 0 || col == 0)
+//                K[row][col] = 0;
+//            else if (w[row - 1] < col + 1 && K[row - 1][col - w[row - 1]] != -1)
+//                K[row][col] = max(v[row - 1] + K[row - 1][col - w[row - 1]],  // include
+//                                  K[row - 1][col]);  // exclude
+//            else
+//                K[row][col] = K[row - 1][col];
+
+            if (row == 0 || col == 0) {
+                K[row][col] = 0;
+            } else if (w[row - 1] <= col) {
+                if (K[row - 1][col - w[row - 1]] != -1 && K[row - 1][col] != -1) {
+                    K[row][col] = max(v[row - 1] + K[row - 1][col - w[row - 1]],  // include
+                                      K[row - 1][col]);  // exclude
+                } else {
+                    break;
+                }
+            } else {
+                if (K[row - 1][col] != -1) {
+                    K[row][col] = K[row - 1][col];
+                } else {
+                    break;
+                }
+            }
+            // broadcast calculated value to other processes
+            cell_result.col = col;
+            cell_result.row = row;
+            cell_result.val = K[row][col];
+            if (K[row][col] == -1) {
+                printf("\n\n\n--------------***************************************\n\n");
+            }
+            for (int dst = 0; dst < nprocs; dst++) {
+                if (dst != rank) {
+                    MPI_Isend(&cell_result, 1, mpi_cell_result, dst, TAG_RESULT, MPI_COMM_WORLD, &request);
+                }
+            }
+            // recv msg
+            int flag = true;
+            while (flag) {
+
+                MPI_Irecv(&cell_result, 1, mpi_cell_result, MPI_ANY_SOURCE, TAG_RESULT,
+                          MPI_COMM_WORLD, &request);
+                MPI_Test(&request, &flag, MPI_STATUS_IGNORE);
+                K[cell_result.row][cell_result.col] = cell_result.val;
+            };
+        }
+
+
+        if (rank == 1) {
+            printf("==========\n");
+//            printf("\n");
+            printf("        ");
+            for (long int l = 0; l < C + 1; ++l) {
+                printf("%4ld ", who_is_handling[l]);
+            }
+            printf("\n----------\n");
+            printf("        ");
+
+            for (long int k = 0; k < C + 1; ++k) {
+                printf("%5ld", k);
+
+            }
+            printf("\n");
+
+            for (int i = 0; i < n + 1; ++i) {
+                if (i != 0) {
+                    printf("%3ld %3ld: ", v[i - 1], w[i - 1]);
+
+                } else {
+                    printf("%3d %3d: ", 0, 0);
+
+                }
+                for (long int j = 0; j < C + 1; ++j) {
+                    printf("%4ld ", K[i][j]);
+                }
+                printf("\n");
+            }
+        }
+//        break;
+////        Kbreak;
+//        if (K[n + 1][C + 1] != -1) {
+//            if (rank == 0) {
+//                return K[n + 1][C + 1];
+//
+//            } else {
+//                MPI_Isend(&K[n + 1][C + 1], 1, MPI_LONG, 0, 233, MPI_COMM_WORLD, &request);
+//            }
+//        }
+//////
+//        int flag = true;
+//
+//        MPI_Irecv(&K[n + 1][C + 1], 1, MPI_LONG, MPI_ANY_SOURCE, 233,
+//                  MPI_COMM_WORLD, &request);
+//        MPI_Test(&request, &flag, MPI_STATUS_IGNORE);
+//        if (flag) {
+//            return K[n + 1][C + 1];
+//        }
+
+
+        // recv msg
+//        int flag = true;
+//        while (flag) {
+//
+//            MPI_Irecv(&task_request, 1, mpi_task_request, MPI_ANY_SOURCE, TAG_TASK_REQUEST,
+//                      MPI_COMM_WORLD, &request);
+//            MPI_Test(&request, &flag, MPI_STATUS_IGNORE);
+//            if (task_request.task == col && task_request.requester > rank) {
+//                who_is_handling[task_request.task] = task_request.requester;
+//            }
+//        };
+        col += nprocs;
+        col %= C + 1;
+//        bool end_flag = true;
+//        while () {
+//            if (who_is_handling[col] == -1) {
+//                task_request.task = col;
+//                task_request.requester = rank;
+//                for (int dst = 0; dst < nprocs; dst++) {
+//                    if (dst != rank) {
+//                        MPI_Isend(&task_request, 1, mpi_task_request, dst, TAG_TASK_REQUEST, MPI_COMM_WORLD, &request);
+//                    }
+//                }
+//                end_flag = false;
+//                break;
+//            }
+//            // recv msg
+//        };
+//
+//        if (end_flag) {
+//            break;
+//        }
+    }
     return 0;
+
 }
 
 /**
