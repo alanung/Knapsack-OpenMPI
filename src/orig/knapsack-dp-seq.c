@@ -61,7 +61,13 @@ long int max(long int x, long int y) {
 long int knapSack(long int C, long int w[], long int v[], int n) {
     int i;
     long int wt;
-    long int K[n+1][C+1];
+    // long int K[n+1][C+1];
+
+    // allocate memory for memoisation table
+    long int **K = malloc((n + 1) * sizeof *K);
+    for (i = 0; i <= n + 1; i++)
+        K[i] = malloc((C + 1) * sizeof *K[i]);
+
     for (i = 0; i <= n; i++) {
         for (wt = 0; wt <= C; wt++) {
             if (i == 0 || wt == 0)
