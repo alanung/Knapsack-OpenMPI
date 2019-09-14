@@ -1,3 +1,4 @@
+mkdir ./bin -p
 echo -e "[*] Compiling knapsack.c to bin/knapsack ... \c"
 mpicc src/orig/knapsack.c -o bin/knapsack
 echo -e "done."

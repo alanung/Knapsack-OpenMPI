@@ -1,4 +1,5 @@
 test() {
+
   ./build.sh
   Problem=$(./bin/generator $1 $2 $3)
   echo -e $Problem
