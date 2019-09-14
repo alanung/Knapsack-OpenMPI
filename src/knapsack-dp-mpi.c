@@ -144,7 +144,7 @@ void task_request(int requester, int task, MPI_Datatype mpi_task_status);
 
 void task_refuse(TaskRequest request);
 
-void listen_for_requests(int rank, int nprocs, MPI_Datatype mpi_task_status);
+void receiveAllMsg(int rank, int nprocs, MPI_Datatype mpi_task_status);
 
 long int max(long int x, long int y) {
     return (x > y) ? x : y;
@@ -162,7 +162,7 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
     task_request(rank, 888, mpi_task_status);
 
-    listen_for_requests(rank, nprocs, mpi_task_status);
+    receiveAllMsg(rank, nprocs, mpi_task_status);
 
 
     printf("[*] P-%d started.\n", rank);
@@ -212,21 +212,23 @@ void task_refuse(TaskRequest request) {
 /**
  * Listen for a request message.
  */
-void listen_for_requests(int rank, int nprocs, MPI_Datatype mpi_task_status) {
+//void listen_for_requests(int rank, int nprocs, MPI_Datatype mpi_task_status) {
+void receiveAllMsg(int rank, int nprocs, MPI_Datatype mpi_task_status) {
     TaskStatus task_status;
 //    sleep(3);
     MPI_Request request;
     MPI_Status status;
 
-    MPI_Irecv(&task_status, 1, mpi_task_status, MPI_ANY_SOURCE, TAG_TASK_REQUEST,
-              MPI_COMM_WORLD, &request);
-    int flag = false;
-
-    MPI_Test(&request, &flag, &status);
-    if(flag){
-        printf("[%d received] task_status.row: %d, task_status.col: %d\n", rank,
-               task_status.row, task_status.col);
-    }
+    int flag;
+    do {
+        MPI_Irecv(&task_status, 1, mpi_task_status, MPI_ANY_SOURCE, TAG_TASK_REQUEST,
+                  MPI_COMM_WORLD, &request);
+        MPI_Test(&request, &flag, &status);
+        printf("[%d received] task_status.row: %d,task_status.col: %d\n", rank, task_status.row, task_status.col);
+        if (!flag) {
+            break;
+        }
+    } while (flag);
 
 
 }
