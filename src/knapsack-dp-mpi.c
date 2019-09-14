@@ -164,13 +164,34 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
 
     // allocate memory for DP memoisation table
     long int **K = malloc((n + 1) * sizeof *K);
-    for (int i = 0; i < n + 1; i++)
+    for (size_t i = 0; i < n + 1; i++)
         K[i] = malloc((C + 1) * sizeof *K[i]);
 
     // initialise all cells to default value INT_MIN
-    for (size_t r = 0; r < n + 1; r++)
-        for (size_t c = 0; c < C + 1; c++)
-            K[r][c] = INT_MIN;
+    for (size_t row = 0; row < n + 1; row++)
+        for (size_t col = 0; col < C + 1; col++)
+            K[row][col] = INT_MIN;
+
+    // all processes initially process the column corresponding to their rank
+    long int col;
+    if (rank < C + 1)
+        col = (long int) rank;
+
+    while (true) {
+        for (size_t row = 0; row < n + 1; row++) {
+            // calculate the value of this cell if dependencies are available
+            if (row == 0 || col == 0)
+                K[row][col] = 0;
+            else if (w[row-1] <= col)
+                K[row][col] = max(row-1 + K[row-1][col - w[row-1]],  // include
+                                  K[row-1][col]);  // exclude
+            else
+                K[row][col] = K[row-1][col];
+            mpi_cell_result.cell=
+            // broadcast calculated value to other processes
+
+        }
+    }
 
     task_request(rank, 888, mpi_task_status);
 
