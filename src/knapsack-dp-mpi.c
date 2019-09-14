@@ -63,6 +63,16 @@ typedef struct {
     int task;
 } TaskRequest;
 
+typedef struct {
+    int task;
+} TaskRefusal;
+
+MPI_Datatype MPI_TASKREQUEST;
+
+void task_request(int requester, int task);
+void task_refuse(TaskRequest request);
+void listen_for_requests(int rank, int nprocs);
+
 long int max(long int x, long int y) {
    return (x > y) ? x : y;
 }
@@ -74,8 +84,8 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
 
     printf("rank: %d\n", rank);
 
-    MPI_Receive(...);
-
+    task_request(rank, 888);
+    listen_for_requests(rank, nprocs);
 
     // int i;
     // long int wt;
@@ -100,18 +110,10 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
 void task_request(int requester, int task) {
     TaskRequest request = {requester, task};
 
-    // create MPI struct type corresponding to TaskRequest
-    int blocklengths[2] = {1, 1};
-    MPI_Datatype types[2] = {MPI_INT, MPI_INT};
-    MPI_Datatype MPI_TaskRequest;
-    MPI_Aint offsets[2];
-    MPI_Type_create_struct(2, blocklengths, offsets, types, &MPI_TaskRequest);
-    MPI_Type_commit(&MPI_TaskRequest);
-
     // send the message to the next rank
     int nprocs;
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
-    MPI_Bsend(&request, 1, MPI_TaskRequest, (requester + 1) % nprocs,
+    MPI_Bsend(&request, 2, MPI_INT, (requester + 1) % nprocs,
               TAG_TASK_REQUEST, MPI_COMM_WORLD);
 }
 
@@ -119,12 +121,33 @@ void task_request(int requester, int task) {
  * Notify a rank that the column it has requested has already been requested.
  */
 void task_refuse(TaskRequest request) {
+    TaskRefusal refusal;
     MPI_Bsend(&request.task, 1, MPI_INT, request.requester, TAG_TASK_REFUSAL,
               MPI_COMM_WORLD);
 }
 
-void process_messages() {
+/**
+ * Listen for a request message.
+ */
+void listen_for_requests(int rank, int nprocs) {
+    TaskRequest request;
     while (true) {
+        MPI_Recv(&request, 2, MPI_INT, MPI_ANY_SOURCE, TAG_TASK_REQUEST,
+                 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        printf("[request received] from: %d, task: %d\n",
+               request.requester, request.task);
+    }
+}
 
+
+/**
+ * Listen for a refusal message.
+ */
+void listen_for_refusals() {
+    TaskRefusal refusal;
+    while (true) {
+        MPI_Recv(&refusal, 1, MPI_INT, MPI_ANY_SOURCE, TAG_TASK_REQUEST,
+                 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        printf("[refusal received] task: %d\n", refusal.task);
     }
 }
