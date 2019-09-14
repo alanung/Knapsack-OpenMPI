@@ -54,6 +54,7 @@ int main(int argc, char *argv[]) {
 #include <assert.h>
 #include <stdbool.h>
 #include <strings.h>
+#include <unistd.h>
 
 #define TAG_TASK_REQUEST 0
 #define TAG_TASK_REFUSAL 1
@@ -159,11 +160,10 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
-
-
-
     task_request(rank, 888, mpi_task_status);
+
     listen_for_requests(rank, nprocs, mpi_task_status);
+
 
     printf("[*] P-%d started.\n", rank);
     // int i;
@@ -188,13 +188,16 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
  */
 void task_request(int requester, int task, MPI_Datatype mpi_task_status) {
     TaskStatus task_status;
-    task_status.row = requester * 10;
-    task_status.col = requester * 100;
-    // send the message to the next rank
-    int nprocs;
-    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
-    MPI_Bsend(&task_status, 1, mpi_task_status, (requester + 1) % nprocs,
-              TAG_TASK_REQUEST, MPI_COMM_WORLD);
+    for (int i = 0; i < 5; i++) {
+        task_status.row = requester * 10 + i;
+        task_status.col = requester * 100 + i;
+        // send the message to the next rank
+        int nprocs;
+        MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+        MPI_Bsend(&task_status, 1, mpi_task_status, (requester + 1) % nprocs,
+                  TAG_TASK_REQUEST, MPI_COMM_WORLD);
+    }
+
 }
 
 /**
@@ -211,11 +214,20 @@ void task_refuse(TaskRequest request) {
  */
 void listen_for_requests(int rank, int nprocs, MPI_Datatype mpi_task_status) {
     TaskStatus task_status;
+//    sleep(3);
+    MPI_Request request;
+    MPI_Status status;
 
-    MPI_Recv(&task_status, 1, mpi_task_status, MPI_ANY_SOURCE, TAG_TASK_REQUEST,
-             MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    printf("[%d received] task_status.row: %d, task_status.col: %d\n", rank,
-           task_status.row, task_status.col);
+    MPI_Irecv(&task_status, 1, mpi_task_status, MPI_ANY_SOURCE, TAG_TASK_REQUEST,
+              MPI_COMM_WORLD, &request);
+    int flag = false;
+
+    MPI_Test(&request, &flag, &status);
+    if(flag){
+        printf("[%d received] task_status.row: %d, task_status.col: %d\n", rank,
+               task_status.row, task_status.col);
+    }
+
 
 }
 
