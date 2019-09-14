@@ -20,8 +20,7 @@ main (int argc, char *argv[])
     int i;
     for (i = 0; i < n; i++) {
         printf ("%ld %ld\n",
-//                1 + (long int)(floor(-log (rand() / RAND_MAX) * mean)),
-                1 + rand() % mean,
+               1 + (long int)(floor(log(rand()) * mean)),
                 1 + rand() % mean);
     }
 }
