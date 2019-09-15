@@ -82,6 +82,8 @@ typedef struct {
 MPI_Datatype structs_register(int type);
 
 void print_info(int rank, long int C, long int *K, long int *v, long int *w, int n);
+void knapsack_master(long int C, int n, long int **K);
+void knapsack_worker(long int C, long int *w, long int *v, int n, long int **K);
 
 #define TAG_TASK_REQUEST 0
 #define TAG_TASK_REFUSAL 1
@@ -121,16 +123,32 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
     // allocate memory for DP memoisation table
-    long int *K = malloc((n + 1) * (C + 1) * sizeof *K);
+    long int **K = malloc((n + 1) * sizeof *K);
     assert(K);
+    for (long int i = 0; i < n + 1; i++) {
+        K[i] = malloc((C + 1) * sizeof(*K[i]));
+        assert(K[i]);
+
+    }
+
+    if (rank == 0)
+        knapsack_master(C, n, K);
+    else
+        knapsack_worker(C, w, v, n, K);
+
+    // BELOW NOT NEEDED
+
     // initialise all cells to default value INT_MIN
     for (long int row = 0; row < n + 1; row++)
         for (long int col = 0; col < C + 1; col++)
-            K[row * (C + 1) + col] = -1;
+            K[row][col] = -1;
 
 
     long int col = rank;
 
+    if (rank == 0) {
+
+    }
 
     while (true) {
 
@@ -195,6 +213,12 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
 
         col += nprocs;
         col %= C + 1;
+    }
+}
+
+void knapsack_master(long int C, int n, long int **K) {
+    for (int i = 0; i < (C + 1) * (n + 1); i++) {
+
     }
 }
 
