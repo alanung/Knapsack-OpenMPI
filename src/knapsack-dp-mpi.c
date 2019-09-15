@@ -135,7 +135,7 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
             K[row][col] = -1;
 
     // allocate array to hold which rank is responsible for each column (no rank = -1)
-    long int *who_is_handling = malloc(nprocs * sizeof *who_is_handling);
+    long int *who_is_handling = malloc((C + 1) * sizeof *who_is_handling);
     for (long int j = 0; j < C + 1; ++j)
         who_is_handling[j] = -1;
 
