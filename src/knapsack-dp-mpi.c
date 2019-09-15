@@ -74,7 +74,8 @@ typedef struct {
 
 typedef struct {
     int row;
-    int col;
+    long int col;
+    int handling_by;
 } TaskStatus;
 
 MPI_Datatype structs_register(int type);
@@ -86,9 +87,14 @@ void broadcast_cell_result(int rank, int nprocs, long int col, int row, long int
 
 void recv_all_cell_result_from_others(MPI_Datatype mpi_cell_result, long int **K);
 
+void broadcast_task_status(TaskStatus task_status, int nprocs, int rank, MPI_Datatype mpi_task_status);
+
+void update_task_status_table(TaskStatus *task_status_table, MPI_Datatype mpi_task_status);
+
 #define TAG_TASK_REQUEST 0
 #define TAG_TASK_REFUSAL 1
 #define TAG_RESULT 2
+#define TAG_TASK_STATUS 2
 
 #define MPI_TASK_STATUS 0
 #define MPI_CELL_RESULT 1
@@ -135,16 +141,26 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
         for (long int col = 0; col < C + 1; col++)
             K[row][col] = -1;
 
-    // allocate array to hold which rank is responsible for each column (no rank = -1)
-    long int *who_is_handling = malloc((C + 1) * sizeof *who_is_handling);
-    for (long int j = 0; j < C + 1; ++j)
-        who_is_handling[j] = -1;
+
+    long int col = rank;
+    TaskStatus task_status_table[C + 1];
+
+    for (long int i = 0; i < C + 1; i++) {
+        task_status_table[i].row = 0;
+        task_status_table[i].handling_by = -1;
+        task_status_table[i].col = i;
+    }
 
     // all processes initially process the column corresponding to their rank
-    long int col = rank;
-
+    task_status.col = rank;
+    task_status.handling_by = rank;
+    task_status.row = 0;
+    // broadcast to others
+    broadcast_task_status(task_status, nprocs, rank, mpi_task_status);
+    // start to handle
     while (true) {
-        for (int row = 0; row < n + 1; row++) {
+
+        for (int row = task_status_table[col].row; row < n + 1; row++) {
             // skip this cell if it has already been calculated
             if (K[row][col] != -1) continue;
 
@@ -152,22 +168,22 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
             if (row == 0 || col == 0) {
                 K[row][col] = 0;
 
-            // if the considered item (row - 1) can fit in the current capacity (col)...
+                // if the considered item (row - 1) can fit in the current capacity (col)...
             } else if (w[row - 1] <= col) {
                 // and the cell dependencies are available, calculate the value of this cell
                 if (K[row - 1][col - w[row - 1]] != -1 && K[row - 1][col] != -1)
                     K[row][col] = max(v[row - 1] + K[row - 1][col - w[row - 1]],  // (include the item)
                                       K[row - 1][col]);  // (exclude the item)
-                // otherwise, if the cell dependencies are not available, stop calculating this column
+                    // otherwise, if the cell dependencies are not available, stop calculating this column
                 else
                     break;
 
-            // otherwise, if it cannot fit...
+                // otherwise, if it cannot fit...
             } else {
                 // take the value from the previous row if available
                 if (K[row - 1][col] != -1)
                     K[row][col] = K[row - 1][col];
-                // otherwise, stop calculating this column
+                    // otherwise, stop calculating this column
                 else
                     break;
             }
@@ -177,41 +193,75 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
             // receive all cell results from other ranks before calculating the next value
             recv_all_cell_result_from_others(mpi_cell_result, K);
         }
+        //update local task_status_table
+        task_status_table[col].handling_by = -1;
+        task_status_table[col].row = row;
+        task_status_table[col].col = col;
+
+        //prepare the msg
+        task_status.handling_by = -1;
+        task_status.row = row;
+        task_status.col = col;
+
+        //broadcast task status to others
+        broadcast_task_status(task_status, nprocs, rank, mpi_task_status);
+        // update task status table by Irecv while loop
+        update_task_status_table(task_status_table, mpi_task_status);
 
         // print current matrix
-//        print_info(rank, C, who_is_handling, K, v, w, n);
+        // print_info(rank, C, who_is_handling, K, v, w, n);
 
         // check if the final answer has been calculated
         if (K[n][C] != -1) {
-            int ans = K[n][C];
+            long int ans = K[n][C];
 
             // free allocated memory
             for (long int i = 0; i < n + 1; i++)
                 free(K[i]);
             free(K);
-            free(who_is_handling);
 
             return ans;
         }
 
-        // move to another column (with n ranks each rank is responsible for every nth column)
-        col += nprocs;
-        col %= C + 1;
+        // get next task to handle
+        while (true) {
+            ++col;
+            col %= C + 1;
+            if (task_status_table[col].handling_by == -1) {
+                // get this col to handle
+                // update local task status table
+                task_status_table[col].handling_by = rank;
+                // prepare msg
+                task_status.col = col;
+                task_status.handling_by = rank;
+                task_status.row = task_status_table[col].row;
+                broadcast_task_status(task_status, nprocs, rank, mpi_task_status);
+                break;
+            }
+            //else check next
+        }
     }
 }
 
 MPI_Datatype structs_register(int type) {
     if (type == MPI_TASK_STATUS) {
+//        typedef struct {
+//            int row;
+//            int handling_by;
+//            int current_pos;
+//        } TaskStatus;
         TaskStatus task_status;
         MPI_Datatype mpi_task_status;
-        MPI_Datatype old_types[2] = {MPI_INT, MPI_INT};
-        MPI_Aint indices[2];
-        int block_length[2] = {1, 1};
+        MPI_Datatype old_types[3] = {MPI_INT, MPI_LONG, MPI_INT};
+        MPI_Aint indices[3];
+        int block_length[3] = {1, 1, 1};
         MPI_Get_address(&task_status, &indices[0]);
         MPI_Get_address(&task_status.col, &indices[1]);
+        MPI_Get_address(&task_status.handling_by, &indices[2]);
+        indices[2] -= indices[0];
         indices[1] -= indices[0];
         indices[0] = 0;
-        MPI_Type_create_struct(2, block_length, indices, old_types, &mpi_task_status);
+        MPI_Type_create_struct(3, block_length, indices, old_types, &mpi_task_status);
         MPI_Type_commit(&mpi_task_status);
         return mpi_task_status;
     } else if (type == MPI_CELL_RESULT) {
@@ -318,3 +368,29 @@ void recv_all_cell_result_from_others(MPI_Datatype mpi_cell_result, long int **K
         K[cell_result.row][cell_result.col] = cell_result.val;
     }
 }
+
+void broadcast_task_status(TaskStatus task_status, int nprocs, int rank, MPI_Datatype mpi_task_status) {
+
+    MPI_Request request;
+    // broadcast task_status value to other processes
+    for (int dst = 0; dst < nprocs; dst++) {
+        if (dst != rank) {
+            MPI_Isend(&task_status, 1, mpi_task_status, dst, TAG_TASK_STATUS, MPI_COMM_WORLD, &request);
+        }
+    }
+};
+
+void update_task_status_table(TaskStatus *task_status_table, MPI_Datatype mpi_task_status) {
+    TaskStatus task_status;
+    MPI_Request request;
+    int flag;
+    while (true) {
+        MPI_Irecv(&task_status, 1, mpi_task_status, MPI_ANY_SOURCE, MPI_TASK_STATUS,
+                  MPI_COMM_WORLD, &request);
+        MPI_Test(&request, &flag, MPI_STATUS_IGNORE);
+        if (!flag) break;
+        task_status_table[task_status.col].row = task_status.row;
+        task_status_table[task_status.col].handling_by = task_status.handling_by;
+        task_status_table[task_status.col].col = task_status.col;
+    }
+};
