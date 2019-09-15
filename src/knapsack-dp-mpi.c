@@ -180,6 +180,10 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
         // print current matrix
         print_info(rank, C, who_is_handling, K, v, w, n);
 
+        // check if the final answer has been calculated
+        if (K[n + 1][C + 1] != -1)
+            return K[n + 1][C + 1];
+
         // move to another column (with n ranks each rank is responsible for every nth column)
         col += nprocs;
         col %= C + 1;
