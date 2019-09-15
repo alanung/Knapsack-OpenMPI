@@ -80,7 +80,7 @@ typedef struct {
 
 MPI_Datatype structs_register(int type);
 
-void print_info(int rank, long int C, long int *who_is_handling, long int **K, long int *v, long int *w, int n);
+void print_info(int rank, long int C, TaskStatus *task_status_table, long int **K, long int *v, long int *w, int n);
 
 void broadcast_cell_result(int rank, int nprocs, long int col, int row, long int **K,
                            MPI_Datatype mpi_cell_result);
@@ -143,7 +143,7 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
 
 
     long int col = rank;
-    TaskStatus task_status_table[C + 1];
+    TaskStatus *task_status_table = malloc((C + 1) * sizeof *task_status_table);
 
     for (long int i = 0; i < C + 1; i++) {
         task_status_table[i].row = 0;
@@ -156,11 +156,21 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
     task_status.handling_by = rank;
     task_status.row = 0;
     // broadcast to others
-    broadcast_task_status(task_status, nprocs, rank, mpi_task_status);
+    task_status_table[rank] = task_status;
+    MPI_Bcast(&task_status_table, C + 1, mpi_task_status, rank, MPI_COMM_WORLD);
+//    broadcast_task_status(task_status, nprocs, rank, mpi_task_status);
     // start to handle
+    long int we_did_it = -1;
     while (true) {
+        int row = task_status_table[col].row;
+        if (rank == 0) {
+            printf("[*] %d is handling %ld, start from %d\n", rank, col, row);
 
-        for (int row = task_status_table[col].row; row < n + 1; row++) {
+        }
+        for (; row < n + 1; row++) {
+            if (we_did_it != -1) {
+                return we_did_it;
+            }
             // skip this cell if it has already been calculated
             if (K[row][col] != -1) continue;
 
@@ -193,24 +203,40 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
             // receive all cell results from other ranks before calculating the next value
             recv_all_cell_result_from_others(mpi_cell_result, K);
         }
+        --row;
         //update local task_status_table
-        task_status_table[col].handling_by = -1;
+        if (row == n) {
+            task_status_table[col].handling_by = INT_MIN;
+        } else {
+            task_status_table[col].handling_by = -1;
+
+        }
         task_status_table[col].row = row;
         task_status_table[col].col = col;
+
 
         //prepare the msg
         task_status.handling_by = -1;
         task_status.row = row;
         task_status.col = col;
 
-        //broadcast task status to others
-        broadcast_task_status(task_status, nprocs, rank, mpi_task_status);
-        // update task status table by Irecv while loop
-        update_task_status_table(task_status_table, mpi_task_status);
+//        printf("\n%d===%d===%ld=====\n", task_status.handling_by, task_status.row, task_status.col);
+//
+//        //broadcast task status to others
+        MPI_Bcast(&task_status_table, C + 1, mpi_task_status, rank, MPI_COMM_WORLD);
 
+//        broadcast_task_status(task_status, nprocs, rank, mpi_task_status);
+
+//        // update task status table by Irecv while loop
+//        update_task_status_table(task_status_table, mpi_task_status);
+
+//
         // print current matrix
-        // print_info(rank, C, who_is_handling, K, v, w, n);
+        if (rank == 0) {
+            print_info(rank, C, task_status_table, K, v, w, n);
 
+        }
+//
         // check if the final answer has been calculated
         if (K[n][C] != -1) {
             long int ans = K[n][C];
@@ -219,12 +245,13 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
             for (long int i = 0; i < n + 1; i++)
                 free(K[i]);
             free(K);
-
+            MPI_Bcast(&we_did_it, 1, MPI_LONG, rank, MPI_COMM_WORLD);
             return ans;
         }
 
         // get next task to handle
         while (true) {
+//            col += nprocs;
             ++col;
             col %= C + 1;
             if (task_status_table[col].handling_by == -1) {
@@ -235,7 +262,9 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
                 task_status.col = col;
                 task_status.handling_by = rank;
                 task_status.row = task_status_table[col].row;
-                broadcast_task_status(task_status, nprocs, rank, mpi_task_status);
+
+                MPI_Bcast(&task_status_table, C + 1, mpi_task_status, rank, MPI_COMM_WORLD);
+//                broadcast_task_status(task_status, nprocs, rank, mpi_task_status);
                 break;
             }
             //else check next
@@ -306,35 +335,43 @@ MPI_Datatype structs_register(int type) {
     }
 }
 
-void print_info(int rank, long int C, long int *who_is_handling, long int **K, long int *v, long int *w, int n) {
-    if (rank == 1) {
-        printf("==========\n");
-        printf("        ");
-        for (long int l = 0; l < C + 1; ++l) {
-            printf("%4ld ", who_is_handling[l]);
+void print_info(int rank, long int C, TaskStatus *task_status_table, long int **K, long int *v, long int *w, int n) {
+    printf("==========\n");
+    printf("hding by:");
+
+    for (long int l = 0; l < C + 1; ++l) {
+        printf("%4d ", task_status_table[l].handling_by);
+    }
+    printf("\n");
+    printf("hdled to:");
+
+
+    for (long int l = 0; l < C + 1; ++l) {
+        printf("%4d ", task_status_table[l].row);
+    }
+
+    printf("\n");
+    printf("     col:");
+
+    for (long int l = 0; l < C + 1; ++l) {
+        printf("%4ld ", task_status_table[l].col);
+    }
+    printf("\n----------\n");
+
+    printf("\n");
+
+    for (int i = 0; i < n + 1; ++i) {
+        if (i != 0) {
+            printf("%3ld %3ld: ", v[i - 1], w[i - 1]);
+
+        } else {
+            printf("%3d %3d: ", 0, 0);
+
         }
-        printf("\n----------\n");
-        printf("        ");
-
-        for (long int k = 0; k < C + 1; ++k) {
-            printf("%5ld", k);
-
+        for (long int j = 0; j < C + 1; ++j) {
+            printf("%4ld ", K[i][j]);
         }
         printf("\n");
-
-        for (int i = 0; i < n + 1; ++i) {
-            if (i != 0) {
-                printf("%3ld %3ld: ", v[i - 1], w[i - 1]);
-
-            } else {
-                printf("%3d %3d: ", 0, 0);
-
-            }
-            for (long int j = 0; j < C + 1; ++j) {
-                printf("%4ld ", K[i][j]);
-            }
-            printf("\n");
-        }
     }
 
 }
@@ -371,6 +408,7 @@ void recv_all_cell_result_from_others(MPI_Datatype mpi_cell_result, long int **K
 
 void broadcast_task_status(TaskStatus task_status, int nprocs, int rank, MPI_Datatype mpi_task_status) {
 
+//    printf("%d ========================", task_status.handling_by);
     MPI_Request request;
     // broadcast task_status value to other processes
     for (int dst = 0; dst < nprocs; dst++) {

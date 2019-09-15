@@ -6,7 +6,7 @@ test() {
   cat in_sadfasdf | mpirun ./bin/knapsack-dp-seq
 
   echo "The knapsack-dp-mpi:"
-  cat in_sadfasdf | mpirun ./bin/knapsack-dp-mpi
+  cat in_sadfasdf | mpirun ./bin/knapsack-dp-mpi -np 4
   rm in_sadfasdf
 }
 
