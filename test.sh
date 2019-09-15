@@ -1,6 +1,6 @@
 test() {
   ./build.sh
-  ./bin/generator $1 $2 $3 > in_sadfasdf
+  ./bin/genknap $1 $2 $3 $4 101010 > in_sadfasdf
   cat in_sadfasdf
   echo "The knapsack-dp-seq:"
   cat in_sadfasdf | mpirun ./bin/knapsack-dp-seq
@@ -15,5 +15,5 @@ if [ ! $1 ] || [ ! $2 ] || [ ! $3 ]; then
   echo -e "Example:\r\n  tesh.sh 10 7 8\r\n"
 
 else
-  test $1 $2 $3
+  test $1 $2 $3 $4
 fi

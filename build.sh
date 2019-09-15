@@ -7,5 +7,5 @@ mpicc src/knapsack-dp-mpi.c -o bin/knapsack-dp-mpi -std=c99
 echo -e "done."
 
 echo -e "[*] Compiling generator.c to bin/generator ... \c"
-gcc util/generator.c -lm -o bin/generator
+gcc util/genknap.c -lm -o bin/genknap
 echo -e "done."
