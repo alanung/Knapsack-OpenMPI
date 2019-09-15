@@ -99,26 +99,27 @@ long int max(long int x, long int y) {
 }
 
 long int knapSack(long int C, long int w[], long int v[], int n) {
+    // broadcast parameters from rank 0 to all ranks
     MPI_Bcast(&C, 1, MPI_LONG, 0, MPI_COMM_WORLD);
     MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
     MPI_Bcast(w, n, MPI_LONG, 0, MPI_COMM_WORLD);
     MPI_Bcast(v, n, MPI_LONG, 0, MPI_COMM_WORLD);
-    int rank, nprocs;
-    //register mpi struct types
+
+    // register MPI struct types
     MPI_Datatype mpi_task_status = structs_register(MPI_TASK_STATUS);
     MPI_Datatype mpi_cell_result = structs_register(MPI_CELL_RESULT);
     MPI_Datatype mpi_task_request = structs_register(MPI_TASK_REQUEST);
     MPI_Datatype mpi_task_refusal = structs_register(MPI_TASK_REFUSAL);
 
+    // declare structs to hold different types of messages
     TaskStatus task_status;
     CellResult cell_result;
     TaskRefusal task_refusal;
     TaskRequest task_request;
 
+    int rank, nprocs;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
-//    nprocs=1;
 
     // allocate memory for DP memoisation table
     long int **K = malloc((n + 1) * sizeof *K);
@@ -127,61 +128,62 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
         K[i] = malloc((C + 1) * sizeof *K[i]);
         assert(K[i]);
     }
+
     // initialise all cells to default value INT_MIN
-    for (long int row = 0; row < n + 1; row++) {
-        for (long int col = 0; col < C + 1; col++) {
+    for (long int row = 0; row < n + 1; row++)
+        for (long int col = 0; col < C + 1; col++)
             K[row][col] = -1;
-        }
-    }
+
+    // allocate array to hold which rank is responsible for each column (no rank = -1)
+    long int *who_is_handling = malloc(nprocs * sizeof *who_is_handling);
+    for (long int j = 0; j < C + 1; ++j)
+        who_is_handling[j] = -1;
 
     // all processes initially process the column corresponding to their rank
-
-    long int *who_is_handling = malloc(nprocs * sizeof *who_is_handling);
-    for (long int j = 0; j < C + 1; ++j) {
-        who_is_handling[j] = -1;
-    }
-
     long int col = rank;
 
     while (true) {
         for (int row = 0; row < n + 1; row++) {
-            //if this cell was calculated
+            // skip this cell if it has already been calculated
             if (K[row][col] != -1) continue;
-            // calculate the value of this cell if dependencies are available
-            if (row == 0 || col == 0) {
-                // init the first row and col
-                K[row][col] = 0;
-            } else if (w[row - 1] <= col) {
-                if (K[row - 1][col - w[row - 1]] != -1 && K[row - 1][col] != -1) {
-                    K[row][col] = max(v[row - 1] + K[row - 1][col - w[row - 1]],  // include
-                                      K[row - 1][col]);  // exclude
-                } else {
-                    //if dependencies are not calculated
-                    break;
-                }
-            } else {
-                if (K[row - 1][col] != -1) {
-                    K[row][col] = K[row - 1][col];
-                } else {
-                    //if dependencies are not calculated
-                    break;
-                }
-            }
-            //broadcast cell result
-            broadcast_cell_result(rank, nprocs, col, row, K, mpi_cell_result);
-            // recv all cell result from others
-            recv_all_cell_result_from_others(mpi_cell_result, K);
 
+            // initialise all values in the first row and col to 0
+            if (row == 0 || col == 0) {
+                K[row][col] = 0;
+
+            // if the considered item (row - 1) can fit in the current capacity (col)...
+            } else if (w[row - 1] <= col) {
+                // and the cell dependencies are available, calculate the value of this cell
+                if (K[row - 1][col - w[row - 1]] != -1 && K[row - 1][col] != -1)
+                    K[row][col] = max(v[row - 1] + K[row - 1][col - w[row - 1]],  // (include the item)
+                                      K[row - 1][col]);  // (exclude the item)
+                // otherwise, if the cell dependencies are not available, stop calculating this column
+                else
+                    break;
+
+            // otherwise, if it cannot fit...
+            } else {
+                // take the value from the previous row if available
+                if (K[row - 1][col] != -1)
+                    K[row][col] = K[row - 1][col];
+                // otherwise, stop calculating this column
+                else
+                    break;
+            }
+
+            // broadcast cell result
+            broadcast_cell_result(rank, nprocs, col, row, K, mpi_cell_result);
+            // receive all cell results from other ranks before calculating the next value
+            recv_all_cell_result_from_others(mpi_cell_result, K);
         }
-        //print current matrix
+
+        // print current matrix
         print_info(rank, C, who_is_handling, K, v, w, n);
-        //move to next job
+
+        // move to another column (with n ranks each rank is responsible for every nth column)
         col += nprocs;
         col %= C + 1;
-
     }
-
-
 }
 
 MPI_Datatype structs_register(int type) {
