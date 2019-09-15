@@ -28,6 +28,7 @@ int main(int argc, char *argv[]) {
         scanf("%d", &n);
     }
 
+    MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
     long int v[n], w[n];        /* value, weight */
 
     if (rank == 0) {
@@ -178,7 +179,7 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
         }
 
         // print current matrix
-        print_info(rank, C, who_is_handling, K, v, w, n);
+//        print_info(rank, C, who_is_handling, K, v, w, n);
 
         // check if the final answer has been calculated
         if (K[n][C] != -1) {
