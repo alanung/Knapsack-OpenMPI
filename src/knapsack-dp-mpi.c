@@ -207,11 +207,11 @@ MPI_Datatype structs_register(int type) {
         MPI_Datatype old_types[2] = {MPI_INT, MPI_INT};
         MPI_Aint indices[2];
         int block_length[2] = {1, 1};
-        MPI_Address(&task_status, &indices[0]);
-        MPI_Address(&task_status.col, &indices[1]);
+        MPI_Get_address(&task_status, &indices[0]);
+        MPI_Get_address(&task_status.col, &indices[1]);
         indices[1] -= indices[0];
         indices[0] = 0;
-        MPI_Type_struct(2, block_length, indices, old_types, &mpi_task_status);
+        MPI_Type_create_struct(2, block_length, indices, old_types, &mpi_task_status);
         MPI_Type_commit(&mpi_task_status);
         return mpi_task_status;
     } else if (type == MPI_CELL_RESULT) {
@@ -220,13 +220,13 @@ MPI_Datatype structs_register(int type) {
         MPI_Datatype old_types[3] = {MPI_INT, MPI_LONG, MPI_LONG};
         MPI_Aint indices[3];
         int block_length[3] = {1, 1, 1};
-        MPI_Address(&cell_result, &indices[0]);
-        MPI_Address(&cell_result.col, &indices[1]);
-        MPI_Address(&cell_result.val, &indices[2]);
+        MPI_Get_address(&cell_result, &indices[0]);
+        MPI_Get_address(&cell_result.col, &indices[1]);
+        MPI_Get_address(&cell_result.val, &indices[2]);
         indices[1] -= indices[0];
         indices[2] -= indices[0];
         indices[0] = 0;
-        MPI_Type_struct(3, block_length, indices, old_types, &mpi_cell_result);
+        MPI_Type_create_struct(3, block_length, indices, old_types, &mpi_cell_result);
         MPI_Type_commit(&mpi_cell_result);
         return mpi_cell_result;
     } else if (type == MPI_TASK_REQUEST) {
@@ -235,11 +235,11 @@ MPI_Datatype structs_register(int type) {
         MPI_Datatype old_types[2] = {MPI_INT, MPI_LONG};
         MPI_Aint indices[2];
         int block_length[2] = {1, 1};
-        MPI_Address(&task_request, &indices[0]);
-        MPI_Address(&task_request.task, &indices[1]);
+        MPI_Get_address(&task_request, &indices[0]);
+        MPI_Get_address(&task_request.task, &indices[1]);
         indices[1] -= indices[0];
         indices[0] = 0;
-        MPI_Type_struct(2, block_length, indices, old_types, &mpi_task_request);
+        MPI_Type_create_struct(2, block_length, indices, old_types, &mpi_task_request);
         MPI_Type_commit(&mpi_task_request);
         return mpi_task_request;
     } else if (type == MPI_TASK_REFUSAL) {
@@ -248,9 +248,9 @@ MPI_Datatype structs_register(int type) {
         MPI_Datatype old_types[1] = {MPI_INT};
         MPI_Aint indices[1];
         int block_length[1] = {1};
-        MPI_Address(&task_refusal, &indices[0]);
+        MPI_Get_address(&task_refusal, &indices[0]);
         indices[0] = 0;
-        MPI_Type_struct(1, block_length, indices, old_types, &mpi_task_refusal);
+        MPI_Type_create_struct(1, block_length, indices, old_types, &mpi_task_refusal);
         MPI_Type_commit(&mpi_task_refusal);
         return mpi_task_refusal;
     }
