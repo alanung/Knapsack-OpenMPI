@@ -181,8 +181,8 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
         print_info(rank, C, who_is_handling, K, v, w, n);
 
         // check if the final answer has been calculated
-        if (K[n + 1][C + 1] != -1) {
-            int ans = K[n + 1][C + 1];
+        if (K[n][C] != -1) {
+            int ans = K[n][C];
 
             // free allocated memory
             for (long int i = 0; i < n + 1; i++)
