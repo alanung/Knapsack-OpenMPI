@@ -217,8 +217,39 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
 }
 
 void knapsack_master(long int C, int n, long int **K) {
+    MPI_Datatype mpi_cell_result = structs_register(MPI_CELL_RESULT);
+    CellResult result;
     for (int i = 0; i < (C + 1) * (n + 1); i++) {
+        MPI_Recv(&result, 1, mpi_cell_result, MPI_ANY_SOURCE, TAG_RESULT,
+                 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        K[result.row][result.col] = result.val;
+    }
+}
 
+void knapsack_worker(long int C, long int *w, long int *v, int n, long int **K) {
+    MPI_Datatype mpi_cell_result = structs_register(MPI_CELL_RESULT);
+    CellResult result;
+    for () {
+        // all cells in row 0 and col 0 have value 0
+        if (row == 0 || col == 0) {
+            K[row * (C + 1) + col] = 0;
+
+        // if the considered item (row - 1) can fit in the current capacity (col), compare including and excluding
+        } else if (w[row - 1] <= col) {
+            // TODO: GET VALUES FROM MASTER
+            K[row * (C + 1) + col] = max(K[(row - 1) * (C + 1) + col],  // (exclude the item)
+                                         v[row - 1] + K[(row - 1) * (C + 1) + col - w[row - 1]]);  // (include the item)
+
+        // otherwise, if it cannot fit, take the value from the previous row
+        } else {
+            // TODO: GET VALUE FROM MASTER
+            K[row * (C + 1) + col] = K[(row - 1) * (C + 1) + col];
+        }
+        cell_result.val = K[row][col];
+        cell_result.col = col;
+        cell_result.row = row;
+        cell_result.handling_by = rank;
+        MPI_Send(&result, 1, mpi_cell_result, 1, TAG_RESULT, MPI_COMM_WORLD);
     }
 }
 
