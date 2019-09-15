@@ -83,7 +83,7 @@ void print_info(int rank, long int C, long int *who_is_handling, long int **K, l
 void broadcast_cell_result(int rank, int nprocs, long int col, int row, long int **K,
                            MPI_Datatype mpi_cell_result);
 
-void recv_all_cell_result_from_others(MPI_Datatype mpi_cell_result, long int **K)
+void recv_all_cell_result_from_others(MPI_Datatype mpi_cell_result, long int **K);
 
 #define TAG_TASK_REQUEST 0
 #define TAG_TASK_REFUSAL 1
@@ -94,7 +94,7 @@ void recv_all_cell_result_from_others(MPI_Datatype mpi_cell_result, long int **K
 #define MPI_TASK_REFUSAL 2
 #define MPI_TASK_REQUEST 3
 
-        long int max(long int x, long int y) {
+long int max(long int x, long int y) {
     return (x > y) ? x : y;
 }
 
@@ -287,7 +287,6 @@ void broadcast_cell_result(int rank, int nprocs, long int col, int row, long int
             MPI_Isend(&cell_result, 1, mpi_cell_result, dst, TAG_RESULT, MPI_COMM_WORLD, &request);
         }
     }
-    return cell_result;
 };
 
 void recv_all_cell_result_from_others(MPI_Datatype mpi_cell_result, long int **K) {
