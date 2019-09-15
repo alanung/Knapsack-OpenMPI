@@ -305,15 +305,15 @@ void broadcast_cell_result(int rank, int nprocs, long int col, int row, long int
 };
 
 void recv_all_cell_result_from_others(MPI_Datatype mpi_cell_result, long int **K) {
-    int flag = true;
-
     CellResult cell_result;
     MPI_Request request;
-    while (flag) {
 
+    int flag;
+    while (true) {
         MPI_Irecv(&cell_result, 1, mpi_cell_result, MPI_ANY_SOURCE, TAG_RESULT,
                   MPI_COMM_WORLD, &request);
         MPI_Test(&request, &flag, MPI_STATUS_IGNORE);
+        if (!flag) break;
         K[cell_result.row][cell_result.col] = cell_result.val;
-    };
+    }
 }
