@@ -1,7 +1,7 @@
 test() {
-  ./build.sh
-  ./bin/genknap $1 $2 $3 $4 101010 > in_sadfasdf
-#  cat in_sadfasdf
+  ./build.sh > /dev/null
+  ./bin/genknap $1 $2 $3 $4 101010 >in_sadfasdf
+  #  cat in_sadfasdf
   echo "The knapsack-dp-seq:"
   cat in_sadfasdf | mpirun ./bin/knapsack-dp-seq
 
@@ -10,10 +10,10 @@ test() {
   rm in_sadfasdf
 }
 
-if [ ! $1 ] || [ ! $2 ] || [ ! $3 ]; then
-  echo -e "Usage:\r\n  ./tesh.sh \$C \$n \$mean\r\n"
-  echo -e "Example:\r\n  tesh.sh 10 7 8\r\n"
+capacity=0
 
-else
-  test $1 $2 $3 $4
-fi
+for ((i = $1; i < $2 + 1; i += $3)); do
+  echo "    Testing $i ... "
+  test $i $4 $5 $6
+  echo -e "    done.\r\n\r\n"
+done
