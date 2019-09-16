@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
 /* PLACE YOUR CHANGES BELOW HERE */
 #include <assert.h>
 #include <math.h>
-#include <stdbool.h>
+#include <mpi.h>
 #include <stdlib.h>
 
 long int max(long int x, long int y) {
@@ -74,11 +74,8 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
 
     // block width (# columns allocated to each rank)
     long int width = (long int) ceil((double) (C + 1) / nprocs);
-//    if (rank == 0)
-//        printf("width: %ld\n", width);
     // column offset for this rank
     long int offset = rank * width;
-//    printf("rank: %d, offset: %ld\n", rank, offset);
 
     // allocate memory to store row of DP memorisation table
     long int *K = calloc(width * nprocs, sizeof *K);
@@ -87,21 +84,8 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
     long int *temp = malloc(width * sizeof *temp);
     assert(temp);
 
-//    if (rank == 0){
-//        printf("                          ");
-//        for (long int i = 0; i < width * nprocs; i++) {
-//            if (i == C)
-//                printf("[");
-//            printf("%3ld ", i);
-//            if (i == C)
-//                printf("]");
-//        }
-//        printf("\n");
-//    }
-
     for (long int item = 0; item < n; item++) {
         // determine new block values from previously broadcast results
-        #pragma omp parallel for
         for (long int col = offset; col < offset + width; col++) {
             // if knapsack capacity is 0, no value possible
             if (col == 0)
@@ -114,18 +98,6 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
                 temp[col - offset] = K[col];
         }
         MPI_Allgather(temp, width, MPI_LONG, K, width, MPI_LONG, MPI_COMM_WORLD);
-//        if (rank == 0) {
-//            printf("[weight: %3ld, value: %3ld] ", w[item], v[item]);
-//            for (long int i = 0; i < width * nprocs; i++) {
-//                if (i == C)
-//                    printf("[");
-//                printf("%3ld ", K[i]);
-//                if (i == C)
-//                    printf("]");
-//            }
-//            printf("\n");
-//            fflush(stdout);
-//        }
     }
 
     int result = K[C];
