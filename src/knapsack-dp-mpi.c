@@ -101,6 +101,7 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
 
     for (long int item = 0; item < n; item++) {
         // determine new block values from previously broadcast results
+        #pragma omp parallel for
         for (long int col = offset; col < offset + width; col++) {
             // if knapsack capacity is 0, no value possible
             if (col == 0)
