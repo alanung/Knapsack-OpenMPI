@@ -74,39 +74,53 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
 
     // block width (# columns allocated to each rank)
     long int width = (long int) ceil((double) (C + 1) / nprocs);
-    if (rank == 0)
-        printf("width: %ld\n", width);
+//    if (rank == 0)
+//        printf("width: %ld\n", width);
     // column offset for this rank
     long int offset = rank * width;
-    printf("rank: %d, offset: %ld\n", rank, offset);
+//    printf("rank: %d, offset: %ld\n", rank, offset);
 
     // allocate memory to store row of DP memorisation table
     long int *K = calloc(width * nprocs, sizeof *K);
     assert(K);
+    // allocate memory as buffer for new block results
+    long int *temp = malloc(width * sizeof *temp);
+    assert(temp);
+
+//    if (rank == 0){
+//        printf("                          ");
+//        for (long int i = 0; i < width * nprocs; i++) {
+//            if (i == C)
+//                printf("[");
+//            printf("%3ld ", i);
+//            if (i == C)
+//                printf("]");
+//        }
+//        printf("\n");
+//    }
 
     for (long int item = 0; item < n; item++) {
-        // this rank's block is updated while other blocks hold values last broadcast
+        // determine new block values from previously broadcast results
         for (long int col = offset; col < offset + width; col++) {
             // if knapsack capacity is 0, no value possible
             if (col == 0)
-                K[col] = 0;
+                temp[col - offset] = 0;
             // else if the item can fit, compare including and excluding the item
             else if (w[item] <= col)
-                K[col] = max(v[item] + K[col - w[item]], K[col]);
+                temp[col - offset] = max(v[item] + K[col - w[item]], K[col]);
             // else (if the item cannot fit), the max value is unchanged
+            else
+                temp[col - offset] = K[col];
         }
-        MPI_Allgather(K + offset, width, MPI_LONG, K, width, MPI_LONG, MPI_COMM_WORLD);
+        MPI_Allgather(temp, width, MPI_LONG, K, width, MPI_LONG, MPI_COMM_WORLD);
 //        if (rank == 0) {
-//            printf("weight: %3ld, value: %3ld\t", w[item], v[item]);
-//            fflush(stdout);
+//            printf("[weight: %3ld, value: %3ld] ", w[item], v[item]);
 //            for (long int i = 0; i < width * nprocs; i++) {
+//                if (i == C)
+//                    printf("[");
 //                printf("%3ld ", K[i]);
-//                fflush(stdout);
-//                if (i == C) {
-//                    printf("|");
-//                    fflush(stdout);
-//                }
-//
+//                if (i == C)
+//                    printf("]");
 //            }
 //            printf("\n");
 //            fflush(stdout);

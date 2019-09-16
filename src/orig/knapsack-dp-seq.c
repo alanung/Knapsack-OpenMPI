@@ -62,7 +62,26 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
     int i;
     long int wt;
     long int K[n+1][C+1];
+
+//    int rank;
+//    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+//
+//    if (rank == 0) {
+//        printf("                          ");
+//        for (long int c = 0; c <= C; c++)
+//            printf("%3ld ", c);
+//        printf("\n");
+//        fflush(stdout);
+//    }
+
     for (i = 0; i <= n; i++) {
+//        if (rank == 0) {
+//            if (i != 0)
+//                printf("[weight: %3ld, value: %3ld] ", w[i - 1], v[i - 1]);
+//            else
+//                printf("                [NO ITEM] ");
+//            fflush(stdout);
+//        }
         for (wt = 0; wt <= C; wt++) {
             if (i == 0 || wt == 0)
                 K[i][wt] = 0;
@@ -70,7 +89,13 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
                 K[i][wt] = max(v[i-1] + K[i-1][wt - w[i-1]], K[i-1][wt]);
             else
                 K[i][wt] = K[i-1][wt];
+//            if (rank == 0)
+//                printf("%3ld ", K[i][wt]);
         }
+//        if (rank == 0) {
+//            printf("\n");
+//            fflush(stdout);
+//        }
     }
     return K[n][C];
 }
