@@ -1,7 +1,7 @@
 test() {
   ./build.sh
   ./bin/genknap $1 $2 $3 $4 101010 > in_sadfasdf
-#  cat in_sadfasdf
+  cat in_sadfasdf
   echo "The knapsack-dp-seq:"
   cat in_sadfasdf | mpirun ./bin/knapsack-dp-seq
 
