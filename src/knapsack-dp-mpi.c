@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
 
     if (rank == 0) {
         printf("knapsack occupancy %ld\n", ks);
-        printf("Time: %ld us\n", (uint64_t)(GetTimeStamp() - start));
+        printf("Time: %ld us\n", (uint64_t) (GetTimeStamp() - start));
     }
 
     MPI_Finalize();
@@ -99,21 +99,22 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
 //        printf("\n");
 //    }
 
+//    omp_set_num_threads(2);
     for (long int item = 0; item < n; item++) {
         // determine new block values from previously broadcast results
-        #pragma omp parallel for
+
         for (long int col = offset; col < offset + width; col++) {
             // if knapsack capacity is 0, no value possible
             if (col == 0)
                 temp[col - offset] = 0;
-            // else if the item can fit, compare including and excluding the item
+                // else if the item can fit, compare including and excluding the item
             else if (w[item] <= col)
                 temp[col - offset] = max(v[item] + K[col - w[item]], K[col]);
-            // else (if the item cannot fit), the max value is unchanged
+                // else (if the item cannot fit), the max value is unchanged
             else
                 temp[col - offset] = K[col];
         }
-        MPI_Allgather(temp, width, MPI_LONG, K, width, MPI_LONG, MPI_COMM_WORLD);
+        MPI_Allgather(temp, (int) width, MPI_LONG, K, (int) width, MPI_LONG, MPI_COMM_WORLD);
 //        if (rank == 0) {
 //            printf("[weight: %3ld, value: %3ld] ", w[item], v[item]);
 //            for (long int i = 0; i < width * nprocs; i++) {
@@ -128,7 +129,7 @@ long int knapSack(long int C, long int w[], long int v[], int n) {
 //        }
     }
 
-    int result = K[C];
+    long int result = K[C];
     free(K);
     return result;
 }
